@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { WalletIsland } from "@/components/ui/wallet-island"
+import Link from "next/link"
 
 export function Header() {
   return (
@@ -37,9 +38,9 @@ export function Header() {
         <WalletIsland />
       </motion.div>
       <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500">
-        <button className="hover:text-neutral-800 transition-colors cursor-pointer">Home</button>
+        <Link href="/" className="hover:text-neutral-800 transition-colors">Home</Link>
         <span className="text-neutral-400">|</span>
-        <button className="hover:text-neutral-800 transition-colors cursor-pointer">My Songs</button>
+        <Link href="/my-songs" className="hover:text-neutral-800 transition-colors">My Songs</Link >
       </nav>
     </div>
   )
