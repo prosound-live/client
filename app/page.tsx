@@ -2,6 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, animate } from 'framer-motion';
 import FamilyButton from '@/components/ui/family-button';
+import { WalletIsland } from '@/components/ui/wallet-island';
 
 const albums = [
   {
@@ -222,7 +223,7 @@ export default function Page() {
         ✧ ProSound
       </motion.div>
       <motion.div
-        className='absolute top-6 right-6 text-neutral-400 text-2xl'
+        className='absolute top-6 right-6 z-50'
         initial={{ opacity: 0, x: 20 }}
         animate={{
           opacity: 1,
@@ -234,11 +235,15 @@ export default function Page() {
           }
         }}
       >
-        ✧
+        <WalletIsland />
       </motion.div>
 
       {/* Header */}
-      <div className='h-10'></div>
+      <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500">
+        <button className="hover:text-neutral-800 transition-colors cursor-pointer">Home</button>
+        <span className="text-neutral-400">|</span>
+        <button className="hover:text-neutral-800 transition-colors cursor-pointer">My Songs</button>
+      </nav>
 
       {/* Title */}
       <div className="flex justify-center mt-4">

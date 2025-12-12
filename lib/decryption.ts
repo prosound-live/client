@@ -51,6 +51,7 @@ export async function getAndDecryptFile(
   try {
     const response = await fetch(url, {
       method: "POST",
+    //   body: JSON.stringify({ cid }),
     });
 
     if (!response.ok) {
