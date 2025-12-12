@@ -4,16 +4,66 @@ import { motion, animate } from 'framer-motion';
 import FamilyButton from '@/components/ui/family-button';
 
 const albums = [
-  { id: 1, title: "THE ALTAR", color: "#2d2d3a" },
-  { id: 2, title: "BANKS III", color: "#3a2d35" },
-  { id: 3, title: "SERPENTINA", color: "#2d3a35" },
-  { id: 4, title: "GODDESS", color: "#35302d" },
-  { id: 5, title: "BRAIN", color: "#2d3540" },
-  { id: 6, title: "DARK SIDE", color: "#3d2d3a" },
-  { id: 7, title: "ECLIPSE", color: "#2d3a3a" },
-  { id: 8, title: "MIDNIGHT", color: "#352d40" },
-  { id: 9, title: "AURORA", color: "#2d3535" },
-  { id: 10, title: "DUSK", color: "#40352d" },
+  {
+    id: 1,
+    title: "THE ALTAR",
+    color: "#2d2d3a",
+    description: "The Altar is Banks' second studio album,<br />released in 2016. It features dark,<br />introspective themes and emotional depth."
+  },
+  {
+    id: 2,
+    title: "BANKS III",
+    color: "#3a2d35",
+    description: "Banks III is her third studio album,<br />showcasing her evolution as an artist<br />with powerful vocals and raw emotion."
+  },
+  {
+    id: 3,
+    title: "SERPENTINA",
+    color: "#2d3a35",
+    description: "Serpentina is Banks' fourth studio album,<br />released in 2022. It explores themes<br />of transformation and rebirth."
+  },
+  {
+    id: 4,
+    title: "GODDESS",
+    color: "#35302d",
+    description: "Goddess is Banks' debut studio album,<br />released in 2014. It established her<br />unique sound and artistic vision."
+  },
+  {
+    id: 5,
+    title: "BRAIN",
+    color: "#2d3540",
+    description: "Brain represents the complexity of<br />human emotion and thought,<br />exploring the depths of consciousness."
+  },
+  {
+    id: 6,
+    title: "DARK SIDE",
+    color: "#3d2d3a",
+    description: "Dark Side delves into the shadows<br />of the human psyche, exploring<br />themes of vulnerability and strength."
+  },
+  {
+    id: 7,
+    title: "ECLIPSE",
+    color: "#2d3a3a",
+    description: "Eclipse captures moments of<br />transformation and change,<br />where light meets darkness."
+  },
+  {
+    id: 8,
+    title: "MIDNIGHT",
+    color: "#352d40",
+    description: "Midnight represents the quiet hours<br />of reflection and introspection,<br />where secrets come to light."
+  },
+  {
+    id: 9,
+    title: "AURORA",
+    color: "#2d3535",
+    description: "Aurora symbolizes the dawn of<br />new beginnings and the beauty<br />that emerges from darkness."
+  },
+  {
+    id: 10,
+    title: "DUSK",
+    color: "#40352d",
+    description: "Dusk captures the transition between<br />day and night, a time of reflection<br />and peaceful contemplation."
+  },
 ];
 
 function CornerBrackets() {
@@ -76,19 +126,19 @@ function CornerBrackets() {
 }
 
 export default function Page() {
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [centerIndex, setCenterIndex] = useState(0);
   const baseSize = 160;
   const gap = 40;
   const itemTotal = baseSize + gap;
-  const scrollTimeout = useRef(null);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const isSnapping = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleWheel = (e) => {
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (isSnapping.current || !container) return;
 
@@ -140,13 +190,13 @@ export default function Page() {
     };
   }, [itemTotal]);
 
-  const getSize = (index) => {
+  const getSize = (index: number) => {
     const dist = Math.abs(index - centerIndex);
     if (dist === 0) return 240;
     return 160;
   };
 
-  const getOpacity = (index) => {
+  const getOpacity = (index: number) => {
     const dist = Math.abs(index - centerIndex);
     if (dist === 0) return 1;
     if (dist === 1) return 0.4;
@@ -184,10 +234,7 @@ export default function Page() {
           }
         }}
       >
-        <FamilyButton
-        >
-          {null}
-        </FamilyButton>
+        ✧
       </motion.div>
 
       {/* Header */}
@@ -239,7 +286,7 @@ export default function Page() {
               return (
                 <motion.div
                   key={album.id}
-                  className="relative flex-shrink-0"
+                  className="relative shrink-0"
                   layout
                   initial={{ opacity: 0 }}
                   animate={{
@@ -308,23 +355,32 @@ export default function Page() {
         }}
       >
         <motion.p
+          key={centerIndex}
           className="text-xs text-neutral-500 leading-relaxed max-w-xs"
-          initial={{ opacity: 0 }}
+          layout
+          layoutRoot
+          initial={{ opacity: 0, y: 10 }}
           animate={{
             opacity: 1,
+            y: 0,
             transition: {
-              delay: 0.4,
-              duration: 0.4,
-              ease: "easeOut",
+              type: "spring",
+              stiffness: 400,
+              damping: 25,
+              delay: 0.2,
             }
           }}
+          exit={{ opacity: 0, y: 10 }}
         >
-          Jillian Rose Banks, better known<br />
-          by her stage name, Banks, is an<br />
-          American singer and songwriter.
+          {albums[centerIndex]?.description?.split('<br />').map((line, i, arr) => (
+            <span key={i}>
+              {line}
+              {i < arr.length - 1 && <br />}
+            </span>
+          ))}
         </motion.p>
         <motion.div
-          className="text-neutral-400 text-2xl"
+          className="text-neutral-400 text-2xl relative"
           initial={{ opacity: 0, rotate: -180 }}
           animate={{
             opacity: 1,
@@ -336,7 +392,9 @@ export default function Page() {
             }
           }}
         >
-          ✦
+          <FamilyButton>
+            {null}
+          </FamilyButton>
         </motion.div>
       </motion.div>
     </div>
