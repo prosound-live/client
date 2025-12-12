@@ -1,98 +1,200 @@
 'use client'
 import { useRef, useState, useEffect } from 'react';
-import { motion, useSpring } from 'framer-motion';
+import { motion, animate } from 'framer-motion';
+import FamilyButton from '@/components/ui/family-button';
 
-function ReelItem({ index, scrollX, containerWidth, itemWidth }) {
-  const [scale, setScale] = useState(0.8);
-  const [opacity, setOpacity] = useState(0.6);
-  
-  const springScale = useSpring(scale, { stiffness: 200, damping: 25 });
-  const springOpacity = useSpring(opacity, { stiffness: 200, damping: 25 });
+const albums = [
+  { id: 1, title: "THE ALTAR", color: "#2d2d3a" },
+  { id: 2, title: "BANKS III", color: "#3a2d35" },
+  { id: 3, title: "SERPENTINA", color: "#2d3a35" },
+  { id: 4, title: "GODDESS", color: "#35302d" },
+  { id: 5, title: "BRAIN", color: "#2d3540" },
+  { id: 6, title: "DARK SIDE", color: "#3d2d3a" },
+  { id: 7, title: "ECLIPSE", color: "#2d3a3a" },
+  { id: 8, title: "MIDNIGHT", color: "#352d40" },
+  { id: 9, title: "AURORA", color: "#2d3535" },
+  { id: 10, title: "DUSK", color: "#40352d" },
+];
 
-  useEffect(() => {
-    const gap = 16;
-    const itemCenter = index * (itemWidth + gap) + itemWidth / 2;
-    const viewCenter = scrollX + containerWidth / 2;
-    const distance = Math.abs(itemCenter - viewCenter);
-    const maxDistance = containerWidth / 2;
-    
-    const normalizedDistance = Math.min(distance / maxDistance, 1);
-    
-    const newScale = 1.3 - normalizedDistance * 0.5;
-    const newOpacity = 1 - normalizedDistance * 0.4;
-    
-    setScale(Math.max(0.8, newScale));
-    setOpacity(Math.max(0.6, newOpacity));
-  }, [scrollX, containerWidth, index, itemWidth]);
-
+function CornerBrackets() {
   return (
-    <motion.div
-      style={{ scale: springScale, opacity: springOpacity }}
-      className="flex-shrink-0 snap-center aspect-square w-40 bg-black text-white flex items-center justify-center text-2xl font-bold"
-    >
-      {index + 1}
-    </motion.div>
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="absolute -top-6 -left-6 w-5 h-5 border-l-2 border-t-2 border-neutral-700"
+      />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="absolute -top-6 -right-6 w-5 h-5 border-r-2 border-t-2 border-neutral-700"
+      />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="absolute -bottom-6 -left-6 w-5 h-5 border-l-2 border-b-2 border-neutral-700"
+      />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="absolute -bottom-6 -right-6 w-5 h-5 border-r-2 border-b-2 border-neutral-700"
+      />
+    </>
   );
 }
 
 export default function Page() {
   const containerRef = useRef(null);
-  const [scrollX, setScrollX] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const itemWidth = 160;
-  const gap = 16;
-  const items = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
+  const [centerIndex, setCenterIndex] = useState(0);
+  const baseSize = 160;
+  const gap = 40;
+  const itemTotal = baseSize + gap;
+  const scrollTimeout = useRef(null);
+  const isSnapping = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    setContainerWidth(container.offsetWidth);
+    const handleWheel = (e) => {
+      e.preventDefault();
+      if (isSnapping.current) return;
 
-    const handleScroll = () => setScrollX(container.scrollLeft);
-    const handleResize = () => setContainerWidth(container.offsetWidth);
+      container.scrollLeft += e.deltaY * 0.8;
 
+      const idx = Math.round(container.scrollLeft / itemTotal);
+      setCenterIndex(Math.max(0, Math.min(albums.length - 1, idx)));
+
+      clearTimeout(scrollTimeout.current);
+      scrollTimeout.current = setTimeout(() => {
+        const snapIdx = Math.round(container.scrollLeft / itemTotal);
+        const clamped = Math.max(0, Math.min(albums.length - 1, snapIdx));
+        const target = clamped * itemTotal;
+
+        isSnapping.current = true;
+        animate(container.scrollLeft, target, {
+          type: "spring",
+          stiffness: 80,
+          damping: 20,
+          mass: 0.5,
+          onUpdate: v => container.scrollLeft = v,
+          onComplete: () => {
+            isSnapping.current = false;
+            setCenterIndex(clamped);
+          }
+        });
+      }, 80);
+    };
+
+    const handleScroll = () => {
+      if (isSnapping.current) return;
+      const idx = Math.round(container.scrollLeft / itemTotal);
+      setCenterIndex(Math.max(0, Math.min(albums.length - 1, idx)));
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
     container.addEventListener('scroll', handleScroll);
-    window.addEventListener('resize', handleResize);
 
     return () => {
+      window.removeEventListener('wheel', handleWheel);
       container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
-  const padding = containerWidth / 2 - itemWidth / 2;
+  const getSize = (index) => {
+    const dist = Math.abs(index - centerIndex);
+    if (dist === 0) return 240;
+    return 160;
+  };
+
+  const getOpacity = (index) => {
+    const dist = Math.abs(index - centerIndex);
+    if (dist === 0) return 1;
+    if (dist === 1) return 0.4;
+    return 0.2;
+  };
 
   return (
-    <div className="h-screen flex flex-col">
-      <p className="flex justify-center items-center p-4 py-2 gap-4">
-        <button>Home</button> | <button>My Purchases</button> | <button>Profile</button>
-      </p>
-      <main className="flex-1 overflow-hidden flex items-center justify-center">
+    <div className="h-screen flex flex-col overflow-hidden bg-neutral-200 relative rounded-3xl">
+      {/* Corner decorations */}
+      <div className="absolute top-6 left-6 text-neutral-400 text-2xl">✧ ProSound</div>
+<div className='absolute top-6 right-6 '><FamilyButton /></div>      
+
+      {/* Header */}
+      <div className='h-10'></div>
+      {/* <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500">
+        <button className="hover:text-neutral-800 transition-colors cursor-pointer">Home</button>
+        <span className="text-neutral-400">|</span>
+        <button className="hover:text-neutral-800 transition-colors cursor-pointer">My Purchases</button>
+      </nav> */}
+
+      {/* Title */}
+      <div className="flex justify-center mt-4">
+        <motion.div
+          key={centerIndex}
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="px-5 py-2 bg-neutral-800 text-white text-xs tracking-widest font-medium rounded-full"
+        >
+          {albums[centerIndex]?.title}
+        </motion.div>
+      </div>
+
+      {/* Reel */}
+      <main className="flex-1 overflow-hidden flex items-center">
         <div
           ref={containerRef}
-          className="w-full overflow-x-auto flex items-center snap-x snap-mandatory"
-          style={{
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
+          className="w-full overflow-x-auto flex items-center"
+          style={{ scrollbarWidth: 'none' }}
         >
-          <div 
-            className="flex gap-4"
-            style={{ paddingLeft: padding, paddingRight: padding }}
+          <div
+            className="flex items-center"
+            style={{
+              paddingLeft: 'calc(50vw - 120px)',
+              paddingRight: 'calc(50vw - 120px)',
+              gap
+            }}
           >
-            {items.map((_, index) => (
-              <ReelItem
-                key={index}
-                index={index}
-                scrollX={scrollX}
-                containerWidth={containerWidth}
-                itemWidth={itemWidth}
-              />
-            ))}
+            {albums.map((album, index) => {
+              const size = getSize(index);
+              const isCenter = index === centerIndex;
+              return (
+                <div key={album.id} className="relative">
+                  {isCenter && <CornerBrackets />}
+                  <motion.div
+                    className="flex-shrink-0 flex items-center justify-center text-2xl font-medium text-white relative overflow-hidden rounded-2xl"
+                    style={{ backgroundColor: album.color }}
+                    animate={{
+                      width: size,
+                      height: size,
+                      opacity: getOpacity(index),
+                    }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 25,
+                    }}
+                  >
+                    <span className="opacity-30 text-sm tracking-widest">{album.title}</span>
+                  </motion.div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <div className="p-8 flex justify-between items-end">
+        <p className="text-xs text-neutral-500 leading-relaxed max-w-xs">
+          Jillian Rose Banks, better known<br />
+          by her stage name, Banks, is an<br />
+          American singer and songwriter.
+        </p>
+        {/* <div className="text-neutral-400 text-xl">❖</div> */}
+        <div className="text-neutral-400 text-2xl">✦</div>
+      </div>
     </div>
   );
 }
