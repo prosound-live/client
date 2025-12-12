@@ -1,0 +1,1 @@
+export const TEE_URI = "https://nondiffuse-prejudgementally-aiko.ngrok-free.dev";
