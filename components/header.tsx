@@ -37,10 +37,10 @@ export function Header() {
       >
         <WalletIsland />
       </motion.div>
-      <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500">
-        <Link href="/" className="hover:text-neutral-800 transition-colors">Home</Link>
+      <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500 bg-neutral-200 dark:bg-neutral-900">
+        <Link href="/" className="hover:text-neutral-800 transition-colors font-semibold tracking-tight">Home</Link>
         <span className="text-neutral-400">|</span>
-        <Link href="/my-songs" className="hover:text-neutral-800 transition-colors">My Songs</Link >
+        <Link href="/my-songs" className="hover:text-neutral-800 transition-colors font-semibold tracking-tight">My Songs</Link >
       </nav>
     </div>
   )

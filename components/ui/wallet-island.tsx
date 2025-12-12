@@ -112,12 +112,12 @@ const WalletIslandContent = () => {
         className="relative w-full flex items-center justify-between px-3 cursor-pointer"
         onClick={handleAddressClick}
       >
-        <DynamicDescription className="text-xs font-medium tracking-tight text-neutral-400">
+        <DynamicTitle className="my-auto text-sm font-black tracking-tighter text-white">
           Wallet
-        </DynamicDescription>
-        <DynamicDescription className="text-xs font-semibold tracking-tight text-white">
+        </DynamicTitle>
+        <DynamicTitle className="my-auto text-sm font-black tracking-tighter text-white">
           {address}
-        </DynamicDescription>
+        </DynamicTitle>
       </div>
     </DynamicContainer>
   )

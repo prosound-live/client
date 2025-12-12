@@ -204,7 +204,7 @@ export default function Page() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-neutral-200 relative pt-20">
+    <div className="h-screen flex flex-col overflow-hidden relative pt-20">
 
       {/* Title */}
       <div className="flex justify-center mt-4">
