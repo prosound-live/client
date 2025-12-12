@@ -2,7 +2,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, animate } from 'framer-motion';
 import FamilyButton from '@/components/ui/family-button';
-import { WalletIsland } from '@/components/ui/wallet-island';
 
 const albums = [
   {
@@ -205,45 +204,7 @@ export default function Page() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-neutral-200 relative">
-      {/* Corner decorations */}
-      <motion.div
-        className="absolute top-6 left-6 text-neutral-400 text-2xl"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{
-          opacity: 1,
-          x: 0,
-          transition: {
-            delay: 0.1,
-            duration: 0.4,
-            ease: "easeOut",
-          }
-        }}
-      >
-        ✧ ProSound
-      </motion.div>
-      <motion.div
-        className='absolute top-6 right-6 z-50'
-        initial={{ opacity: 0, x: 20 }}
-        animate={{
-          opacity: 1,
-          x: 0,
-          transition: {
-            delay: 0.15,
-            duration: 0.4,
-            ease: "easeOut",
-          }
-        }}
-      >
-        <WalletIsland />
-      </motion.div>
-
-      {/* Header */}
-      <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500">
-        <button className="hover:text-neutral-800 transition-colors cursor-pointer">Home</button>
-        <span className="text-neutral-400">|</span>
-        <button className="hover:text-neutral-800 transition-colors cursor-pointer">My Songs</button>
-      </nav>
+    <div className="h-screen flex flex-col overflow-hidden bg-neutral-200 relative pt-20">
 
       {/* Title */}
       <div className="flex justify-center mt-4">
