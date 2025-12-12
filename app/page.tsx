@@ -30,7 +30,7 @@ function CornerBrackets() {
             ease: "easeOut",
           }
         }}
-        className="absolute -top-6 -left-6 w-5 h-5 border-l-2 border-t-2 border-neutral-700"
+        className="absolute -top-8 -left-8 w-6 h-6 border-l-2 border-t-2 border-neutral-700"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
@@ -43,7 +43,7 @@ function CornerBrackets() {
             ease: "easeOut",
           }
         }}
-        className="absolute -top-6 -right-6 w-5 h-5 border-r-2 border-t-2 border-neutral-700"
+        className="absolute -top-8 -right-8 w-6 h-6 border-r-2 border-t-2 border-neutral-700"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
@@ -56,7 +56,7 @@ function CornerBrackets() {
             ease: "easeOut",
           }
         }}
-        className="absolute -bottom-6 -left-6 w-5 h-5 border-l-2 border-b-2 border-neutral-700"
+        className="absolute -bottom-8 -left-8 w-6 h-6 border-l-2 border-b-2 border-neutral-700"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
@@ -69,26 +69,26 @@ function CornerBrackets() {
             ease: "easeOut",
           }
         }}
-        className="absolute -bottom-6 -right-6 w-5 h-5 border-r-2 border-b-2 border-neutral-700"
+        className="absolute -bottom-8 -right-8 w-6 h-6 border-r-2 border-b-2 border-neutral-700"
       />
     </>
   );
 }
 
 export default function Page() {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
   const [centerIndex, setCenterIndex] = useState(0);
   const baseSize = 160;
   const gap = 40;
   const itemTotal = baseSize + gap;
-  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeout = useRef(null);
   const isSnapping = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleWheel = (e: WheelEvent) => {
+    const handleWheel = (e) => {
       e.preventDefault();
       if (isSnapping.current || !container) return;
 
@@ -140,13 +140,13 @@ export default function Page() {
     };
   }, [itemTotal]);
 
-  const getSize = (index: number) => {
+  const getSize = (index) => {
     const dist = Math.abs(index - centerIndex);
     if (dist === 0) return 240;
     return 160;
   };
 
-  const getOpacity = (index: number) => {
+  const getOpacity = (index) => {
     const dist = Math.abs(index - centerIndex);
     if (dist === 0) return 1;
     if (dist === 1) return 0.4;
@@ -172,7 +172,7 @@ export default function Page() {
         ✧ ProSound
       </motion.div>
       <motion.div
-        className='absolute top-6 right-6'
+        className='absolute top-6 right-6 text-neutral-400 text-2xl'
         initial={{ opacity: 0, x: 20 }}
         animate={{
           opacity: 1,
@@ -184,16 +184,14 @@ export default function Page() {
           }
         }}
       >
-        <FamilyButton>{null}</FamilyButton>
+        <FamilyButton
+        >
+          {null}
+        </FamilyButton>
       </motion.div>
 
       {/* Header */}
       <div className='h-10'></div>
-      {/* <nav className="flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500">
-        <button className="hover:text-neutral-800 transition-colors cursor-pointer">Home</button>
-        <span className="text-neutral-400">|</span>
-        <button className="hover:text-neutral-800 transition-colors cursor-pointer">My Purchases</button>
-      </nav> */}
 
       {/* Title */}
       <div className="flex justify-center mt-4">
@@ -224,7 +222,7 @@ export default function Page() {
       <main className="flex-1 overflow-hidden flex items-center">
         <div
           ref={containerRef}
-          className="w-full overflow-x-auto flex items-center"
+          className="w-full overflow-x-auto flex items-center py-16"
           style={{ scrollbarWidth: 'none' }}
         >
           <div
@@ -241,7 +239,7 @@ export default function Page() {
               return (
                 <motion.div
                   key={album.id}
-                  className="relative"
+                  className="relative flex-shrink-0"
                   layout
                   initial={{ opacity: 0 }}
                   animate={{
