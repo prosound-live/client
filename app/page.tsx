@@ -154,7 +154,7 @@ export default function Page() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-neutral-200 relative rounded-3xl">
+    <div className="h-screen flex flex-col overflow-hidden bg-neutral-200 relative">
       {/* Corner decorations */}
       <motion.div
         className="absolute top-6 left-6 text-neutral-400 text-2xl"
