@@ -710,10 +710,12 @@ function ConfirmView() {
 
     const {
         mintRecord,
+        generateLicense,
         status: mintStatus,
         isLoading: isMinting,
         error: mintError,
         txHash,
+        tokenId,
     } = useMintRecord()
 
     const formatFileSize = (bytes: number) => {
@@ -773,6 +775,12 @@ function ConfirmView() {
                 return "Minting your record NFT..."
             case "confirming":
                 return "Confirming transaction..."
+            case "minted":
+                return "NFT minted! Click 'Generate License' to register on Story Protocol."
+            case "registering-ip":
+                return "Registering IP on Story Protocol..."
+            case "attaching-license":
+                return "Attaching license terms..."
             case "notifying-tee":
                 return "Registering with secure storage..."
             case "error":
@@ -783,6 +791,12 @@ function ConfirmView() {
     }
 
     const hasError = mintStatus === "error"
+    const isMinted = mintStatus === "minted"
+    const isGeneratingLicense = ["registering-ip", "attaching-license", "notifying-tee"].includes(mintStatus)
+
+    const handleGenerateLicense = async () => {
+        await generateLicense()
+    }
 
     return (
         <div>
@@ -834,16 +848,22 @@ function ConfirmView() {
                     </div>
 
                     {/* Minting Status */}
-                    {(isMinting || hasError) && (
+                    {(isMinting || isMinted || isGeneratingLicense || hasError) && (
                         <div className="space-y-2 pt-2 border-t border-border">
-                            <div className={`flex items-center gap-2 text-xs ${hasError ? "text-red-500" : "text-muted-foreground"}`}>
-                                {isMinting && <Loader2 className="size-3 animate-spin" />}
+                            <div className={`flex items-center gap-2 text-xs ${hasError ? "text-red-500" : isMinted ? "text-green-500" : "text-muted-foreground"}`}>
+                                {(isMinting || isGeneratingLicense) && <Loader2 className="size-3 animate-spin" />}
+                                {isMinted && <CheckCircle className="size-3" />}
                                 {hasError && <AlertCircle className="size-3" />}
                                 <span>{getStatusMessage()}</span>
                             </div>
                             {txHash && (
                                 <p className="text-xs text-muted-foreground truncate">
                                     Tx: {txHash}
+                                </p>
+                            )}
+                            {tokenId && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                    Token ID: {tokenId}
                                 </p>
                             )}
                         </div>
@@ -855,27 +875,47 @@ function ConfirmView() {
                     onClick={() => setView("metadata")}
                     className="bg-secondary text-secondary-foreground"
                     // @ts-expect-error - disabled prop is not defined in FamilyDrawerSecondaryButton
-                    disabled={isMinting}
+                    disabled={isMinting || isMinted || isGeneratingLicense}
                 >
                     <ArrowLeft className="size-4" /> Back
                 </FamilyDrawerSecondaryButton>
-                <FamilyDrawerSecondaryButton
-                    onClick={handleMint}
-                    className={`bg-yellow-400 text-black ${isMinting ? "opacity-50 cursor-not-allowed" : ""}`}
-                    // @ts-expect-error - disabled prop is not defined in FamilyDrawerSecondaryButton
-                    disabled={isMinting}
-                >
-                    {isMinting ? (
-                        <>
-                            <Loader2 className="size-4 animate-spin" /> Minting...
-                        </>
-                    ) : (
-                        <>
-                            <Upload className="size-4" />
-                            Upload
-                        </>
-                    )}
-                </FamilyDrawerSecondaryButton>
+
+                {/* Show "Generate License" button when NFT is minted */}
+                {isMinted ? (
+                    <FamilyDrawerSecondaryButton
+                        onClick={handleGenerateLicense}
+                        className="bg-green-500 text-white"
+                    >
+                        <CheckCircle className="size-4" />
+                         License
+                    </FamilyDrawerSecondaryButton>
+                ) : isGeneratingLicense ? (
+                    <FamilyDrawerSecondaryButton
+                        className="bg-yellow-400 text-black opacity-50 cursor-not-allowed"
+                        // @ts-expect-error - disabled prop is not defined in FamilyDrawerSecondaryButton
+                        disabled={true}
+                    >
+                        <Loader2 className="size-4 animate-spin" /> Waiting...
+                    </FamilyDrawerSecondaryButton>
+                ) : (
+                    <FamilyDrawerSecondaryButton
+                        onClick={handleMint}
+                        className={`bg-yellow-400 text-black ${isMinting ? "opacity-50 cursor-not-allowed" : ""}`}
+                        // @ts-expect-error - disabled prop is not defined in FamilyDrawerSecondaryButton
+                        disabled={isMinting}
+                    >
+                        {isMinting ? (
+                            <>
+                                <Loader2 className="size-4 animate-spin" /> Minting...
+                            </>
+                        ) : (
+                            <>
+                                <Upload className="size-4" />
+                                Mint NFT
+                            </>
+                        )}
+                    </FamilyDrawerSecondaryButton>
+                )}
             </div>
         </div>
     )

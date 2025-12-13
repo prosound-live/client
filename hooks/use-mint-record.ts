@@ -1,7 +1,20 @@
 import { useState, useCallback } from "react";
-import { useWriteContract, usePublicClient } from "wagmi";
-import { parseEther } from "viem";
-import { FACTORY_ADDRESS, FACTORY_ABI, TEE_URI } from "@/lib/constants";
+import { useWriteContract, usePublicClient, useConfig } from "wagmi";
+import { getWalletClient } from "@wagmi/core";
+import { parseEther, http, zeroAddress, TransactionReceipt, Log } from "viem";
+import { StoryClient, TokenIdInput } from "@story-protocol/core-sdk";
+import {
+  FACTORY_ADDRESS,
+  FACTORY_ABI,
+  TEE_URI,
+  RECORD_NFT_ADDRESS,
+  MOCKERC20_ADDRESS, // This is actually WIP token
+} from "@/lib/constants";
+
+// ============== STORY PROTOCOL CONSTANTS (Aeneid Testnet) ==============
+
+const STORY_RPC = "https://aeneid.storyrpc.io";
+const ROYALTY_POLICY_LAP = "0xBe54FB168b3c982b7AaE60dB6CF75Bd8447b390E";
 
 // ============== TYPES ==============
 
@@ -30,6 +43,9 @@ export type MintStatus =
   | "waiting-approval"
   | "minting"
   | "confirming"
+  | "minted" // New status: NFT minted, waiting for user to generate license
+  | "registering-ip"
+  | "attaching-license"
   | "notifying-tee"
   | "success"
   | "error";
@@ -38,39 +54,37 @@ export interface TEENotifyPayload {
   userAddress: string;
   encryptedCid: string;
   metadata: MusicMetadataForIPFS;
+  ipId?: string;
+  licenseTermsId?: string;
+  tokenId?: string;
 }
 
 export interface UseMintRecordResult {
-  /** Current mint status */
   status: MintStatus;
-  /** Whether a mint operation is in progress */
   isLoading: boolean;
-  /** Error message if mint failed */
   error: string | null;
-  /** Transaction hash */
   txHash: string | null;
-  /** Metadata IPFS URL */
   metadataUrl: string | null;
-  /** Mint a new record NFT */
+  ipId: string | null;
+  licenseTermsId: string | null;
+  tokenId: string | null;
   mintRecord: (params: {
     userAddress: string;
     metadata: Omit<MusicMetadataForIPFS, "createdAt">;
     encryptedCid: string;
     pricePerMonth: string;
   }) => Promise<boolean>;
-  /** Reset the hook state */
+  generateLicense: () => Promise<boolean>;
   reset: () => void;
 }
 
 // ============== HELPER FUNCTIONS ==============
 
 async function notifyTEE(payload: TEENotifyPayload): Promise<void> {
-  console.log('payload', payload)
+  console.log("TEE payload:", payload);
   const response = await fetch(`${TEE_URI}/api/v1/NFT/uploaddata`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -85,9 +99,7 @@ async function uploadMetadataToPinata(
 ): Promise<PinataUploadResponse> {
   const response = await fetch("/api/pinata/upload", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ metadata }),
   });
 
@@ -100,6 +112,45 @@ async function uploadMetadataToPinata(
   return result;
 }
 
+function parseTokenIdFromReceipt(receipt: TransactionReceipt): bigint {
+  const transferTopic =
+    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+  // Look for Transfer event from RECORD_NFT contract
+  const transferLog = receipt.logs.find(
+    (log: Log) =>
+      log.topics[0]?.toLowerCase() === transferTopic.toLowerCase() &&
+      log.address.toLowerCase() === RECORD_NFT_ADDRESS.toLowerCase()
+  );
+
+  if (transferLog && transferLog.topics[3]) {
+    return BigInt(transferLog.topics[3]);
+  }
+
+  // Fallback: try any Transfer event
+  for (const log of receipt.logs) {
+    if (
+      log.topics[0]?.toLowerCase() === transferTopic.toLowerCase() &&
+      log.topics[3]
+    ) {
+      return BigInt(log.topics[3]);
+    }
+  }
+
+  throw new Error("Could not find token ID in transaction receipt");
+}
+
+function createMetadataHash(data: string): `0x${string}` {
+  const encoder = new TextEncoder();
+  const encoded = encoder.encode(data);
+  let hash = 0;
+  for (let i = 0; i < encoded.length; i++) {
+    hash = (hash << 5) - hash + encoded[i];
+    hash = hash & hash;
+  }
+  return `0x${Math.abs(hash).toString(16).padStart(64, "0")}` as `0x${string}`;
+}
+
 // ============== HOOK ==============
 
 export function useMintRecord(): UseMintRecordResult {
@@ -107,8 +158,21 @@ export function useMintRecord(): UseMintRecordResult {
   const [error, setError] = useState<string | null>(null);
   const [metadataUrl, setMetadataUrl] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [ipId, setIpId] = useState<string | null>(null);
+  const [licenseTermsId, setLicenseTermsId] = useState<string | null>(null);
+  const [tokenId, setTokenId] = useState<string | null>(null);
+
+  // Store data needed for license generation
+  const [pendingData, setPendingData] = useState<{
+    userAddress: string;
+    encryptedCid: string;
+    metadata: MusicMetadataForIPFS;
+    priceInWei: bigint;
+    ipfsHash: string;
+  } | null>(null);
 
   const publicClient = usePublicClient();
+  const config = useConfig();
   const { writeContractAsync, reset: resetWrite } = useWriteContract();
 
   const reset = useCallback(() => {
@@ -116,9 +180,14 @@ export function useMintRecord(): UseMintRecordResult {
     setError(null);
     setMetadataUrl(null);
     setTxHash(null);
+    setIpId(null);
+    setLicenseTermsId(null);
+    setTokenId(null);
+    setPendingData(null);
     resetWrite();
   }, [resetWrite]);
 
+  // Step 1: Upload metadata and mint NFT
   const mintRecord = useCallback(
     async (params: {
       userAddress: string;
@@ -128,12 +197,22 @@ export function useMintRecord(): UseMintRecordResult {
     }): Promise<boolean> => {
       const { userAddress, metadata, encryptedCid, pricePerMonth } = params;
 
+      if (!publicClient) {
+        setError("Public client not available");
+        setStatus("error");
+        return false;
+      }
+
       setError(null);
       setMetadataUrl(null);
       setTxHash(null);
+      setIpId(null);
+      setLicenseTermsId(null);
+      setTokenId(null);
+      setPendingData(null);
 
       try {
-        // Step 1: Upload metadata to IPFS via Pinata
+        // ==================== STEP 1: Upload Metadata ====================
         setStatus("uploading-metadata");
 
         const fullMetadata: MusicMetadataForIPFS = {
@@ -144,13 +223,13 @@ export function useMintRecord(): UseMintRecordResult {
         const pinataResult = await uploadMetadataToPinata(fullMetadata);
         setMetadataUrl(pinataResult.metadataUrl);
 
-        // Step 2: Call mintRecord on the factory contract
+        console.log("✅ Step 1: Metadata uploaded:", pinataResult.metadataUrl);
+
+        // ==================== STEP 2: Mint NFT ====================
         setStatus("waiting-approval");
 
-        // Convert price to wei
         const priceInWei = parseEther(pricePerMonth);
 
-        // Use writeContractAsync to get the transaction hash
         const hash = await writeContractAsync({
           address: FACTORY_ADDRESS as `0x${string}`,
           abi: FACTORY_ABI,
@@ -161,32 +240,34 @@ export function useMintRecord(): UseMintRecordResult {
         setTxHash(hash);
         setStatus("confirming");
 
-        // Step 3: Wait for transaction receipt
-        if (!publicClient) {
-          throw new Error("Public client not available");
+        console.log("✅ Step 2: Mint tx submitted:", hash);
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        if (receipt.status !== "success") {
+          throw new Error("Mint transaction failed");
         }
 
-        const receipt = await publicClient.waitForTransactionReceipt({
-          hash,
+        const mintedTokenId = parseTokenIdFromReceipt(receipt);
+        setTokenId(mintedTokenId.toString());
+
+        console.log("✅ Step 2: NFT minted, Token ID:", mintedTokenId.toString());
+
+        // Store data for license generation
+        setPendingData({
+          userAddress,
+          encryptedCid,
+          metadata: fullMetadata,
+          priceInWei,
+          ipfsHash: pinataResult.ipfsHash,
         });
 
-        // Check if transaction was successful
-        if (receipt.status === "success") {
-          // Step 4: Notify TEE with user address, encrypted CID, and all metadata
-          setStatus("notifying-tee");
-
-          await notifyTEE({
-            userAddress,
-            encryptedCid,
-            metadata: fullMetadata,
-          });
-
-          setStatus("success");
-          return true;
-        } else {
-          throw new Error("Transaction failed");
-        }
+        // Set status to minted - waiting for user to click "Generate License"
+        setStatus("minted");
+        console.log("📝 NFT minted. Click 'Generate License' to continue.");
+        return true;
       } catch (err) {
+        console.error("❌ Mint error:", err);
         const message = err instanceof Error ? err.message : "Mint failed";
         setError(message);
         setStatus("error");
@@ -196,12 +277,137 @@ export function useMintRecord(): UseMintRecordResult {
     [writeContractAsync, publicClient]
   );
 
-  const isLoading =
-    status === "uploading-metadata" ||
-    status === "waiting-approval" ||
-    status === "minting" ||
-    status === "confirming" ||
-    status === "notifying-tee";
+  // Step 2: Generate license (called by user after mint)
+  const generateLicense = useCallback(async (): Promise<boolean> => {
+    if (!pendingData || !tokenId || !metadataUrl) {
+      setError("No pending mint data. Please mint first.");
+      setStatus("error");
+      return false;
+    }
+
+    try {
+      // Get fresh wallet client using getWalletClient from @wagmi/core
+      setStatus("registering-ip");
+      console.log("🔄 Getting wallet client...");
+
+      const walletClient = await getWalletClient(config);
+
+      if (!walletClient) {
+        throw new Error("Wallet not connected. Please connect your wallet.");
+      }
+
+      console.log("✅ Wallet client obtained:", walletClient.account.address);
+
+      // ==================== STEP 3: Register IP on Story Protocol ====================
+      const storyClient = StoryClient.newClient({
+        chainId: "aeneid",
+        transport: http(STORY_RPC),
+        wallet: walletClient,
+      });
+
+      console.log("🔄 Step 3: Registering IP Asset...");
+
+      const registerResponse = await storyClient.ipAsset.register({
+        nftContract: RECORD_NFT_ADDRESS as `0x${string}`,
+        tokenId: BigInt(tokenId) as TokenIdInput,
+        ipMetadata: {
+          ipMetadataURI: metadataUrl,
+          ipMetadataHash: createMetadataHash(metadataUrl),
+          nftMetadataURI: metadataUrl,
+          nftMetadataHash: createMetadataHash(pendingData.ipfsHash),
+        },
+        txOptions: { confirmations: 1 },
+      });
+
+      console.log("🔄 Step 3: Register response:", registerResponse);
+
+      const registeredIpId = registerResponse.ipId;
+      setIpId(registeredIpId || null);
+
+      if (!registeredIpId) {
+        throw new Error("Failed to register IP Asset");
+      }
+
+      console.log("✅ Step 3: IP registered:", registeredIpId);
+
+      // ==================== STEP 4: Attach License Terms ====================
+      setStatus("attaching-license");
+
+      console.log("🔄 Step 4: Attaching license terms...");
+
+      const licenseResponse =
+        await storyClient.license.registerPilTermsAndAttach({
+          ipId: registeredIpId,
+          licenseTermsData: [
+            {
+              terms: {
+                transferable: true,
+                royaltyPolicy: ROYALTY_POLICY_LAP as `0x${string}`,
+                defaultMintingFee: pendingData.priceInWei,
+                expiration: BigInt(0),
+                commercialUse: true,
+                commercialAttribution: true,
+                commercializerChecker: zeroAddress,
+                commercializerCheckerData: "0x" as `0x${string}`,
+                commercialRevShare: 0,
+                commercialRevCeiling: BigInt(0),
+                derivativesAllowed: false,
+                derivativesAttribution: false,
+                derivativesApproval: false,
+                derivativesReciprocal: false,
+                derivativeRevCeiling: BigInt(0),
+                currency: MOCKERC20_ADDRESS as `0x${string}`, // WIP token
+                uri: metadataUrl,
+              },
+            },
+          ],
+          txOptions: { confirmations: 1 },
+        });
+
+      const newLicenseTermsId =
+        licenseResponse.licenseTermsIds?.[0]?.toString();
+      setLicenseTermsId(newLicenseTermsId || null);
+
+      console.log("✅ Step 4: License attached, Terms ID:", newLicenseTermsId);
+
+      // ==================== STEP 5: Notify TEE ====================
+      setStatus("notifying-tee");
+
+      console.log("🔄 Step 5: Notifying TEE...");
+
+      await notifyTEE({
+        userAddress: pendingData.userAddress,
+        encryptedCid: pendingData.encryptedCid,
+        metadata: pendingData.metadata,
+        ipId: registeredIpId,
+        licenseTermsId: newLicenseTermsId,
+        tokenId: tokenId,
+      });
+
+      console.log("✅ Step 5: TEE notified");
+
+      setStatus("success");
+      setPendingData(null);
+      console.log("🎉 All steps completed successfully!");
+      return true;
+    } catch (err) {
+      console.error("❌ License generation error:", err);
+      const message = err instanceof Error ? err.message : "License generation failed";
+      setError(message);
+      setStatus("error");
+      return false;
+    }
+  }, [config, pendingData, tokenId, metadataUrl]);
+
+  const isLoading = [
+    "uploading-metadata",
+    "waiting-approval",
+    "minting",
+    "confirming",
+    "registering-ip",
+    "attaching-license",
+    "notifying-tee",
+  ].includes(status);
 
   return {
     status,
@@ -209,7 +415,11 @@ export function useMintRecord(): UseMintRecordResult {
     error,
     txHash,
     metadataUrl,
+    ipId,
+    licenseTermsId,
+    tokenId,
     mintRecord,
+    generateLicense,
     reset,
   };
 }
