@@ -1,6 +1,72 @@
 import { TEE_URI } from "./constants";
 
 /**
+ * Fetch and decrypt file from TEE using only CID
+ * @param {string} cid - IPFS CID/hash
+ * @param {Object} [options] - Additional options
+ * @param {Function} [options.onProgress] - Progress callback (bytesReceived, totalBytes)
+ * @param {string} [options.fileType] - MIME type for the blob (default: "audio/mpeg")
+ * @returns {Promise<Blob>} - Decrypted file as Blob
+ */
+export async function decryptByCid(
+  cid: string,
+  options: {
+    onProgress?: (bytesReceived: number, totalBytes: number | null) => void;
+    fileType?: string;
+  } = {}
+): Promise<Blob> {
+  const { onProgress, fileType = "audio/mpeg" } = options;
+
+  if (!cid) {
+    throw new Error("Missing required parameter: cid");
+  }
+
+  const url = `${TEE_URI}/api/v1/pinata/decrypt?cid=${encodeURIComponent(cid)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        message: response.statusText,
+      }));
+      throw new Error(
+        error.message || `HTTP error! status: ${response.status}`
+      );
+    }
+
+    const contentLength = response.headers.get("content-length");
+    const totalBytes = contentLength ? parseInt(contentLength, 10) : null;
+
+    const reader = response.body!.getReader();
+    const chunks: BlobPart[] = [];
+    let receivedBytes = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      chunks.push(value);
+      receivedBytes += value.length;
+
+      if (onProgress && totalBytes) {
+        onProgress(receivedBytes, totalBytes);
+      }
+    }
+
+    return new Blob(chunks, { type: fileType });
+  } catch (error) {
+    console.error("Error decrypting file:", error);
+    throw error;
+  }
+}
+
+/**
  * Fetch and decrypt file from Pinata IPFS
  * @param {Object} params - Decryption parameters
  * @param {string} params.cid - IPFS CID/hash

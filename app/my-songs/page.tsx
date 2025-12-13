@@ -3,7 +3,9 @@ import { useRef, useState, useEffect } from 'react';
 import { motion, animate } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { TEE_URI } from '@/lib/constants';
+import { decryptByCid } from '@/lib/decryption';
 import Image from 'next/image';
+import { Play, Pause, Loader2 } from 'lucide-react';
 
 interface SongAttribute {
   trait_type: string;
@@ -49,6 +51,7 @@ interface Album {
   image: string;
   artist: string;
   genre: string;
+  cid: string;
 }
 
 const colorPalette = [
@@ -127,6 +130,14 @@ export default function Page() {
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const isSnapping = useRef(false);
 
+  // Audio playback state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playingAlbumId, setPlayingAlbumId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
     async function fetchSongs() {
       if (!address) {
@@ -155,6 +166,7 @@ export default function Page() {
             image: song.image,
             artist: song.properties.artist,
             genre: song.properties.genre,
+            cid: song.properties.encryptedMusicCid || song.animation_url,
           }));
           setAlbums(transformedAlbums);
         }
@@ -224,6 +236,19 @@ export default function Page() {
     };
   }, [itemTotal, albums.length]);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
+
   const getSize = (index: number) => {
     const dist = Math.abs(index - centerIndex);
     if (dist === 0) return 240;
@@ -235,6 +260,85 @@ export default function Page() {
     if (dist === 0) return 1;
     if (dist === 1) return 0.4;
     return 0.2;
+  };
+
+  const handlePlayPause = async (album: Album) => {
+    // If same album is playing, toggle play/pause
+    if (playingAlbumId === album.id && audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+      return;
+    }
+
+    // Stop current audio if different album
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    }
+
+    if (!album.cid) {
+      console.error('Missing CID for playback');
+      return;
+    }
+
+    setIsLoadingAudio(true);
+    setAudioProgress(0);
+    setPlayingAlbumId(album.id);
+
+    try {
+      const blob = await decryptByCid(album.cid, {
+        onProgress: (received, total) => {
+          if (total) {
+            setAudioProgress((received / total) * 100);
+          }
+        },
+      });
+
+      console.log('Blob received:', blob.size, blob.type);
+
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+      setIsLoadingAudio(false);
+
+      // Create and play audio
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onplay = () => setIsPlaying(true);
+      audio.onpause = () => setIsPlaying(false);
+      audio.onended = () => {
+        setIsPlaying(false);
+        setPlayingAlbumId(null);
+        URL.revokeObjectURL(url);
+        setAudioUrl(null);
+      };
+      audio.onerror = (e) => {
+        console.error('Audio error:', e, audio.error);
+        setIsPlaying(false);
+        setPlayingAlbumId(null);
+      };
+
+      // Wait for audio to be ready before playing
+      audio.oncanplaythrough = () => {
+        audio.play().catch(err => {
+          console.error('Play failed:', err);
+        });
+      };
+
+      // Load the audio
+      audio.load();
+    } catch (error) {
+      console.error('Playback error:', error);
+      setIsLoadingAudio(false);
+      setPlayingAlbumId(null);
+    }
   };
 
   // Show nothing while loading
@@ -383,6 +487,34 @@ export default function Page() {
                       >
                         {album.title}
                       </motion.span>
+                    )}
+
+                    {/* Play button overlay for center album */}
+                    {isCenter && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{
+                          opacity: 1,
+                          scale: 1,
+                          transition: { delay: 0.3 }
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handlePlayPause(album)}
+                        disabled={isLoadingAudio && playingAlbumId === album.id}
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition-colors cursor-pointer"
+                      >
+                        {isLoadingAudio && playingAlbumId === album.id ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="w-12 h-12 text-white animate-spin" />
+                            <span className="text-white text-xs">{audioProgress.toFixed(0)}%</span>
+                          </div>
+                        ) : playingAlbumId === album.id && isPlaying ? (
+                          <Pause className="w-12 h-12 text-white" />
+                        ) : (
+                          <Play className="w-12 h-12 text-white" />
+                        )}
+                      </motion.button>
                     )}
                   </motion.div>
                 </motion.div>
