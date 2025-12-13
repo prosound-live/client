@@ -183,7 +183,7 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
 
           {/* Add Button */}
           <motion.button
-            className="absolute bottom-3 right-3 w-8 h-8 bg-card rounded-full flex items-center justify-center shadow-lg"
+            className="absolute bottom-3 right-3 cursor-pointer px-4 py-2 bg-card rounded-full flex items-center justify-center shadow-lg"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{
               opacity: isHovered || isSelected ? 1 : 0,
