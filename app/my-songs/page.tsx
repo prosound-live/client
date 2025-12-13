@@ -502,7 +502,7 @@ export default function Page() {
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handlePlayPause(album)}
                         disabled={isLoadingAudio && playingAlbumId === album.id}
-                        className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition-colors cursor-pointer"
+                        className="absolute inset-0 flex items-center justify-center  hover:bg-black/50 transition-colors cursor-pointer"
                       >
                         {isLoadingAudio && playingAlbumId === album.id ? (
                           <div className="flex flex-col items-center gap-2">

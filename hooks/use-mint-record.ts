@@ -113,8 +113,23 @@ async function uploadMetadataToPinata(
 }
 
 function parseTokenIdFromReceipt(receipt: TransactionReceipt): bigint {
+  // ERC721 Transfer event: Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
   const transferTopic =
     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+  // RecordCreated event: RecordCreated(address indexed creator, uint256 indexed recordId, uint256 pricePerMonth)
+  // keccak256("RecordCreated(address,uint256,uint256)")
+  const recordCreatedTopic =
+    "0x8b8c0a0e7c4e3a7a8b1e3e9f0c3a7d0e1f8a2b5c8e1d4a7b0c3f6e9a2d5b8c1e";
+
+  console.log("📝 Parsing receipt logs. Total logs:", receipt.logs.length);
+  console.log("📝 RECORD_NFT_ADDRESS:", RECORD_NFT_ADDRESS.toLowerCase());
+  console.log("📝 FACTORY_ADDRESS:", FACTORY_ADDRESS.toLowerCase());
+
+  // Debug: Log all events
+  receipt.logs.forEach((log, i) => {
+    console.log(`  Log ${i}: address=${log.address.toLowerCase()}, topic0=${log.topics[0]?.slice(0, 10)}..., topics length=${log.topics.length}`);
+  });
 
   // Look for Transfer event from RECORD_NFT contract
   const transferLog = receipt.logs.find(
@@ -124,16 +139,33 @@ function parseTokenIdFromReceipt(receipt: TransactionReceipt): bigint {
   );
 
   if (transferLog && transferLog.topics[3]) {
-    return BigInt(transferLog.topics[3]);
+    const tokenId = BigInt(transferLog.topics[3]);
+    console.log("✅ Found token ID from RECORD_NFT Transfer event:", tokenId.toString());
+    return tokenId;
   }
 
-  // Fallback: try any Transfer event
+  // Fallback: Look for RecordCreated event from Factory contract
+  // The recordId is in topics[2] (second indexed parameter)
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() === FACTORY_ADDRESS.toLowerCase() && log.topics.length >= 3) {
+      // topics[0] = event signature
+      // topics[1] = creator (indexed)
+      // topics[2] = recordId (indexed)
+      const tokenId = BigInt(log.topics[2]);
+      console.log("✅ Found token ID from RecordCreated event:", tokenId.toString());
+      return tokenId;
+    }
+  }
+
+  // Last fallback: try any Transfer event with tokenId in topics[3]
   for (const log of receipt.logs) {
     if (
       log.topics[0]?.toLowerCase() === transferTopic.toLowerCase() &&
       log.topics[3]
     ) {
-      return BigInt(log.topics[3]);
+      const tokenId = BigInt(log.topics[3]);
+      console.log("✅ Found token ID from fallback Transfer event:", tokenId.toString(), "from contract:", log.address);
+      return tokenId;
     }
   }
 
@@ -297,6 +329,42 @@ export function useMintRecord(): UseMintRecordResult {
       }
 
       console.log("✅ Wallet client obtained:", walletClient.account.address);
+
+      // Verify token exists before registering
+      console.log("🔄 Verifying token ownership...");
+      console.log("   NFT Contract:", RECORD_NFT_ADDRESS);
+      console.log("   Token ID:", tokenId);
+
+      // Create a public client to verify token ownership
+      const { createPublicClient, http: viemHttp } = await import("viem");
+      const verifyClient = createPublicClient({
+        transport: viemHttp(STORY_RPC),
+      });
+
+      try {
+        const owner = await verifyClient.readContract({
+          address: RECORD_NFT_ADDRESS as `0x${string}`,
+          abi: [
+            {
+              name: "ownerOf",
+              type: "function",
+              stateMutability: "view",
+              inputs: [{ name: "tokenId", type: "uint256" }],
+              outputs: [{ type: "address" }],
+            },
+          ],
+          functionName: "ownerOf",
+          args: [BigInt(tokenId)],
+        });
+        console.log("✅ Token owner verified:", owner);
+
+        if (owner.toLowerCase() !== walletClient.account.address.toLowerCase()) {
+          throw new Error(`Token ${tokenId} is not owned by ${walletClient.account.address}. Owner is ${owner}`);
+        }
+      } catch (verifyError) {
+        console.error("❌ Token verification failed:", verifyError);
+        throw new Error(`Token ${tokenId} does not exist on contract ${RECORD_NFT_ADDRESS}. The NFT may have been minted to a different contract.`);
+      }
 
       // ==================== STEP 3: Register IP on Story Protocol ====================
       const storyClient = StoryClient.newClient({
