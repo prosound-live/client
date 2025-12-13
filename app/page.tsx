@@ -1,32 +1,60 @@
 'use client'
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus } from 'lucide-react';
+import { TEE_URI } from '@/lib/constants';
+import Image from 'next/image';
 
-const albums = [
-  { id: 1, title: "THE ALTAR", color: "#2d2d3a", artist: "Banks", genre: "Alternative", year: 2016, price: 9.99 },
-  { id: 2, title: "BANKS III", color: "#3a2d35", artist: "Banks", genre: "Alternative", year: 2019, price: 12.99 },
-  { id: 3, title: "SERPENTINA", color: "#2d3a35", artist: "Banks", genre: "Alternative", year: 2022, price: 14.99 },
-  { id: 4, title: "GODDESS", color: "#35302d", artist: "Banks", genre: "Alternative", year: 2014, price: 8.99 },
-  { id: 5, title: "BRAIN", color: "#2d3540", artist: "Banks", genre: "Electronic", year: 2020, price: 11.99 },
-  { id: 6, title: "DARK SIDE", color: "#3d2d3a", artist: "Banks", genre: "Alternative", year: 2018, price: 10.99 },
-  { id: 7, title: "ECLIPSE", color: "#2d3a3a", artist: "Banks", genre: "Electronic", year: 2021, price: 13.99 },
-  { id: 8, title: "MIDNIGHT", color: "#352d40", artist: "Banks", genre: "Alternative", year: 2017, price: 9.99 },
-  { id: 9, title: "AURORA", color: "#2d3535", artist: "Banks", genre: "Electronic", year: 2023, price: 15.99 },
-  { id: 10, title: "DUSK", color: "#40352d", artist: "Banks", genre: "Alternative", year: 2015, price: 8.99 },
-];
+interface SongAttribute {
+  trait_type: string;
+  value: string;
+}
 
-const genres = ["All", "Alternative", "Electronic"];
+interface SongProperties {
+  userAddress: string;
+  encryptedCid: string;
+  encryptedMusicCid: string;
+  artist: string;
+  genre: string;
+  pricePerMonth: string;
+}
+
+interface Song {
+  tokenId: string;
+  name: string;
+  description: string;
+  image: string;
+  animation_url: string;
+  attributes: SongAttribute[];
+  properties: SongProperties;
+  created_at: string;
+}
+
+interface ApiResponse {
+  status: number;
+  payload: {
+    count: number;
+    items: Song[];
+  };
+  message: string;
+  success: boolean;
+}
 
 type Album = {
-  id: number;
+  id: string;
   title: string;
   color: string;
   artist: string;
   genre: string;
-  year: number;
   price: number;
+  image: string;
+  description: string;
 };
+
+const colorPalette = [
+  "#2d2d3a", "#3a2d35", "#2d3a35", "#35302d", "#2d3540",
+  "#3d2d3a", "#2d3a3a", "#352d40", "#2d3535", "#40352d"
+];
 
 function CornerBrackets({ visible }: { visible: boolean }) {
   if (!visible) return null;
@@ -122,18 +150,28 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
           }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
         >
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.span
-              className="text-white text-xs tracking-widest font-medium text-center px-4"
-              animate={{
-                opacity: isHovered || isSelected ? 0.4 : 0.15,
-                fontSize: isSelected ? '0.875rem' : '0.75rem'
-              }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            >
-              {album.title}
-            </motion.span>
-          </div>
+          {album.image ? (
+            <Image
+              src={album.image}
+              alt={album.title}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              className="object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.span
+                className="text-white text-xs tracking-widest font-medium text-center px-4"
+                animate={{
+                  opacity: isHovered || isSelected ? 0.4 : 0.15,
+                  fontSize: isSelected ? '0.875rem' : '0.75rem'
+                }}
+                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              >
+                {album.title}
+              </motion.span>
+            </div>
+          )}
 
           {/* Hover Overlay */}
           <motion.div
@@ -162,13 +200,13 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
             <Plus className="w-4 h-4 text-card-foreground" />
           </motion.button>
 
-          {/* Year Badge */}
+          {/* Genre Badge */}
           <motion.div
             className="absolute top-3 left-3 px-2 py-1 bg-card/90 backdrop-blur-sm rounded text-[10px] tracking-wider text-card-foreground"
             animate={{ opacity: isHovered || isSelected ? 1 : 0 }}
             transition={{ duration: 0.2 }}
           >
-            {album.year}
+            {album.genre.toUpperCase()}
           </motion.div>
 
           {/* Price Badge */}
@@ -177,7 +215,7 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
             animate={{ opacity: isHovered || isSelected ? 1 : 0 }}
             transition={{ duration: 0.2 }}
           >
-            ${album.price}
+            {album.price} IP/mo
           </motion.div>
         </motion.div>
 
@@ -206,16 +244,61 @@ export default function Marketplace() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('All');
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [genres, setGenres] = useState<string[]>(['All']);
+
+  useEffect(() => {
+    async function fetchAlbums() {
+      try {
+        const response = await fetch(`${TEE_URI}/api/v1/NFT/getdata`, {
+          method: 'POST',
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
+        });
+        const data: ApiResponse = await response.json();
+
+        if (data.success && data.payload.items) {
+          const transformedAlbums: Album[] = data.payload.items.map((song, index) => ({
+            id: song.tokenId,
+            title: song.name,
+            color: colorPalette[index % colorPalette.length],
+            artist: song.properties.artist,
+            genre: song.properties.genre,
+            price: parseFloat(song.properties.pricePerMonth),
+            image: song.image,
+            description: song.description,
+          }));
+          setAlbums(transformedAlbums);
+
+          // Extract unique genres
+          const uniqueGenres = ['All', ...new Set(transformedAlbums.map(a => a.genre))];
+          setGenres(uniqueGenres);
+        }
+      } catch (error) {
+        console.error('Failed to fetch albums:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchAlbums();
+  }, []);
 
   const filteredAlbums = useMemo(() => {
     return albums.filter(album => {
       const matchesSearch = !searchQuery ||
         album.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         album.artist.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesGenre = selectedGenre === 'All' || album.genre === selectedGenre;
+      const matchesGenre = selectedGenre === 'All' || album.genre.toLowerCase() === selectedGenre.toLowerCase();
       return matchesSearch && matchesGenre;
     });
-  }, [searchQuery, selectedGenre]);
+  }, [searchQuery, selectedGenre, albums]);
+
+  if (isLoading) {
+    return <div className="min-h-screen" />;
+  }
 
   return (
     <div className="min-h-screen py-16 px-6 pt-0">
@@ -300,7 +383,7 @@ export default function Marketplace() {
               className="flex justify-center mb-8"
             >
               <div className="px-5 py-2 bg-primary text-primary-foreground text-xs tracking-widest font-medium rounded-full">
-                {selectedAlbum.title}
+                {selectedAlbum.title.toUpperCase()}
               </div>
             </motion.div>
           )}
@@ -365,8 +448,11 @@ export default function Marketplace() {
                   <span className="font-semibold text-foreground">{selectedAlbum.title}</span> by {selectedAlbum.artist}
                 </p>
                 <p className="text-muted-foreground">
-                  {selectedAlbum.genre} • {selectedAlbum.year} • ${selectedAlbum.price}/month
+                  {selectedAlbum.genre} • {selectedAlbum.price} IP/month
                 </p>
+                {selectedAlbum.description && (
+                  <p className="mt-2 text-muted-foreground">{selectedAlbum.description}</p>
+                )}
               </motion.div>
               <motion.button
                 className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-xs tracking-wider font-medium"
