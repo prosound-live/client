@@ -14,16 +14,16 @@ interface FamilyButtonProps {
     onOpenChange?: (open: boolean) => void
 }
 
-const FamilyButton: React.FC<FamilyButtonProps> = ({ 
-    children, 
-    open: controlledOpen, 
-    onOpenChange 
+const FamilyButton: React.FC<FamilyButtonProps> = ({
+    children,
+    open: controlledOpen,
+    onOpenChange
 }) => {
     const [internalOpen, setInternalOpen] = useState(false)
-    
+
     // Support both controlled and uncontrolled modes
     const isExpanded = controlledOpen !== undefined ? controlledOpen : internalOpen
-    
+
     const toggleExpand = () => {
         const newState = !isExpanded
         if (onOpenChange) {

@@ -52,7 +52,7 @@ function WalletContent({ onUploadClick }: WalletContentProps) {
 
     const { data: tokenBalance } = useBalance({
         address: fullAddress,
-        token: TOKEN_ADDRESS,
+        // token: TOKEN_ADDRESS,
         query: {
             enabled: isConnected && !!fullAddress,
         },
@@ -82,13 +82,13 @@ function WalletContent({ onUploadClick }: WalletContentProps) {
                 className="flex items-center gap-2 text-xl font-semibold text-white mb-4"
             >
                 <Image
-                    src="/usdc.png"
+                    src="/ip.png"
                     alt="USDC"
                     width={24}
                     height={24}
                     className="rounded-full"
                 />
-                {balance} USDC
+                {balance} IP
             </motion.div>
 
             {/* Address Section */}
