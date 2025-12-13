@@ -87,7 +87,7 @@ function WalletContent({ onUploadClick }: WalletContentProps) {
                     height={24}
                     className="rounded-full"
                 />
-                {balance} IP
+                {balance} WIP
             </motion.div>
 
             {/* Address Section */}

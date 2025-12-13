@@ -68,7 +68,7 @@ function WalletContent({ onUploadClick }: { onUploadClick: () => void }) {
           height={24}
           className="rounded-full"
         />
-        {balance} IP
+        {balance} WIP
       </motion.div>
 
       <motion.div
