@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useWriteContract, usePublicClient, useConfig } from "wagmi";
 import { getWalletClient } from "@wagmi/core";
-import { parseEther, http, zeroAddress, TransactionReceipt, Log } from "viem";
+import { parseEther, http, zeroAddress } from "viem";
 import { StoryClient, TokenIdInput } from "@story-protocol/core-sdk";
 import {
   FACTORY_ADDRESS,
@@ -28,6 +28,7 @@ export interface MusicMetadataForIPFS {
   encryptedMusicCid: string;
   createdAt: string;
   tokenId?: string;
+  nftTokenId?: string;
 }
 
 export interface PinataUploadResponse {
@@ -111,67 +112,6 @@ async function uploadMetadataToPinata(
   }
 
   return result;
-}
-
-function parseTokenIdFromReceipt(receipt: TransactionReceipt): bigint {
-  // ERC721 Transfer event: Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
-  const transferTopic =
-    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
-  // RecordCreated event: RecordCreated(address indexed creator, uint256 indexed recordId, uint256 pricePerMonth)
-  // keccak256("RecordCreated(address,uint256,uint256)")
-  const recordCreatedTopic =
-    "0x8b8c0a0e7c4e3a7a8b1e3e9f0c3a7d0e1f8a2b5c8e1d4a7b0c3f6e9a2d5b8c1e";
-
-  console.log("📝 Parsing receipt logs. Total logs:", receipt.logs.length);
-  console.log("📝 RECORD_NFT_ADDRESS:", RECORD_NFT_ADDRESS.toLowerCase());
-  console.log("📝 FACTORY_ADDRESS:", FACTORY_ADDRESS.toLowerCase());
-
-  // Debug: Log all events
-  receipt.logs.forEach((log, i) => {
-    console.log(`  Log ${i}: address=${log.address.toLowerCase()}, topic0=${log.topics[0]?.slice(0, 10)}..., topics length=${log.topics.length}`);
-  });
-
-  // Look for Transfer event from RECORD_NFT contract
-  const transferLog = receipt.logs.find(
-    (log: Log) =>
-      log.topics[0]?.toLowerCase() === transferTopic.toLowerCase() &&
-      log.address.toLowerCase() === RECORD_NFT_ADDRESS.toLowerCase()
-  );
-
-  if (transferLog && transferLog.topics[3]) {
-    const tokenId = BigInt(transferLog.topics[3]);
-    console.log("✅ Found token ID from RECORD_NFT Transfer event:", tokenId.toString());
-    return tokenId;
-  }
-
-  // Fallback: Look for RecordCreated event from Factory contract
-  // The recordId is in topics[2] (second indexed parameter)
-  for (const log of receipt.logs) {
-    if (log.address.toLowerCase() === FACTORY_ADDRESS.toLowerCase() && log.topics.length >= 3) {
-      // topics[0] = event signature
-      // topics[1] = creator (indexed)
-      // topics[2] = recordId (indexed)
-      //@ts-expect-error - log.topics is indexed and can be accessed safely
-      const tokenId = BigInt(log.topics[2]);
-      console.log("✅ Found token ID from RecordCreated event:", tokenId.toString());
-      return tokenId;
-    }
-  }
-
-  // Last fallback: try any Transfer event with tokenId in topics[3]
-  for (const log of receipt.logs) {
-    if (
-      log.topics[0]?.toLowerCase() === transferTopic.toLowerCase() &&
-      log.topics[3]
-    ) {
-      const tokenId = BigInt(log.topics[3]);
-      console.log("✅ Found token ID from fallback Transfer event:", tokenId.toString(), "from contract:", log.address);
-      return tokenId;
-    }
-  }
-
-  throw new Error("Could not find token ID in transaction receipt");
 }
 
 function createMetadataHash(data: string): `0x${string}` {
@@ -282,7 +222,21 @@ export function useMintRecord(): UseMintRecordResult {
           throw new Error("Mint transaction failed");
         }
 
-        const mintedTokenId = parseTokenIdFromReceipt(receipt);
+        // Parse RecordCreated event from transaction receipt to get tokenId
+        // RecordCreated(address indexed creator, uint256 indexed recordId, uint256 pricePerMonth)
+        // topic[0] = event signature, topic[1] = creator (indexed), topic[2] = recordId (indexed)
+        console.log("🔄 Parsing RecordCreated event from receipt...");
+
+        const recordCreatedLog = receipt.logs.find(log =>
+          log.address.toLowerCase() === FACTORY_ADDRESS.toLowerCase() && log.topics.length === 3
+        );
+
+        if (!recordCreatedLog) {
+          throw new Error("RecordCreated event not found in transaction receipt");
+        }
+
+        // The recordId is the second indexed parameter (topic[2])
+        const mintedTokenId = BigInt(recordCreatedLog.topics[2] as string);
         setTokenId(mintedTokenId.toString());
 
         console.log("✅ Step 2: NFT minted, Token ID:", mintedTokenId.toString());
@@ -451,6 +405,7 @@ export function useMintRecord(): UseMintRecordResult {
         metadata: {
           ...pendingData.metadata,
           tokenId: tokenId,
+          nftTokenId: tokenId,
         },
         ipId: registeredIpId,
         licenseTermsId: newLicenseTermsId,
