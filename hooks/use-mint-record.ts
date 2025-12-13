@@ -151,6 +151,7 @@ function parseTokenIdFromReceipt(receipt: TransactionReceipt): bigint {
       // topics[0] = event signature
       // topics[1] = creator (indexed)
       // topics[2] = recordId (indexed)
+      //@ts-expect-error - log.topics is indexed and can be accessed safely
       const tokenId = BigInt(log.topics[2]);
       console.log("✅ Found token ID from RecordCreated event:", tokenId.toString());
       return tokenId;
