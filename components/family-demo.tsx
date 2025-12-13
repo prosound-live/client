@@ -7,8 +7,7 @@ import { useAccount, useBalance } from "wagmi"
 import Image from "next/image"
 import FamilyButton from "@/components/ui/family-button"
 import { MusicUploadDrawer } from "@/components/music-upload-drawer"
-
-const TOKEN_ADDRESS = "0xF1815bd50389c46847f0Bda824eC8da914045D14" as const
+import { MOCKERC20_ADDRESS } from "@/lib/constants"
 
 export function FamilyButtonDemo() {
     // State to control the wallet button/popover
@@ -52,7 +51,7 @@ function WalletContent({ onUploadClick }: WalletContentProps) {
 
     const { data: tokenBalance } = useBalance({
         address: fullAddress,
-        // token: TOKEN_ADDRESS,
+        token: MOCKERC20_ADDRESS,
         query: {
             enabled: isConnected && !!fullAddress,
         },

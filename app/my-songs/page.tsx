@@ -1,7 +1,6 @@
 'use client'
 import { useRef, useState, useEffect } from 'react';
 import { motion, animate } from 'framer-motion';
-import FamilyButtonDemo from '@/components/family-demo';
 import { useAccount } from 'wagmi';
 import { TEE_URI } from '@/lib/constants';
 import Image from 'next/image';
@@ -116,51 +115,6 @@ function CornerBrackets() {
   );
 }
 
-function SkeletonCard({ size, isCenter }: { size: number; isCenter: boolean }) {
-  return (
-    <motion.div
-      className="relative shrink-0"
-      layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isCenter ? 1 : 0.4 }}
-      transition={{
-        type: "spring",
-        stiffness: 400,
-        damping: 25,
-      }}
-    >
-      {isCenter && <CornerBrackets />}
-      <motion.div
-        layout
-        className="shrink-0 flex items-center justify-center relative overflow-hidden bg-neutral-800"
-        initial={{ borderRadius: 12 }}
-        animate={{
-          width: size,
-          height: size,
-          borderRadius: isCenter ? 16 : 12,
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 400,
-          damping: 25,
-        }}
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-neutral-700 to-transparent"
-          animate={{
-            x: ['-100%', '100%'],
-          }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-      </motion.div>
-    </motion.div>
-  );
-}
-
 export default function Page() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [centerIndex, setCenterIndex] = useState(0);
@@ -189,7 +143,6 @@ export default function Page() {
               'ngrok-skip-browser-warning': 'true',
             },
           }
-
         );
         const data: ApiResponse = await response.json();
 
@@ -284,83 +237,12 @@ export default function Page() {
     return 0.2;
   };
 
-  const skeletonItems = [0, 1, 2, 3, 4];
-
+  // Show nothing while loading
   if (isLoading) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden relative pt-20">
-        {/* Skeleton Title */}
-        <div className="flex justify-center mt-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="px-5 py-2 bg-neutral-800 rounded-full w-32 h-7 relative overflow-hidden"
-          >
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-neutral-700 to-transparent"
-              animate={{ x: ['-100%', '100%'] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-            />
-          </motion.div>
-        </div>
-
-        {/* Skeleton Reel */}
-        <main className="flex-1 overflow-hidden flex items-center">
-          <div className="w-full flex items-center py-16">
-            <div
-              className="flex items-center"
-              style={{
-                paddingLeft: 'calc(50vw - 120px)',
-                paddingRight: 'calc(50vw - 120px)',
-                gap
-              }}
-            >
-              {skeletonItems.map((_, index) => (
-                <SkeletonCard
-                  key={index}
-                  size={index === 2 ? 240 : 160}
-                  isCenter={index === 2}
-                />
-              ))}
-            </div>
-          </div>
-        </main>
-
-        {/* Skeleton Footer */}
-        <motion.div
-          className="p-8 flex justify-between items-end"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <div className="space-y-2">
-            <div className="h-3 w-48 bg-neutral-800 rounded relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-neutral-700 to-transparent"
-                animate={{ x: ['-100%', '100%'] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-              />
-            </div>
-            <div className="h-3 w-40 bg-neutral-800 rounded relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-neutral-700 to-transparent"
-                animate={{ x: ['-100%', '100%'] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "linear", delay: 0.1 }}
-              />
-            </div>
-            <div className="h-3 w-36 bg-neutral-800 rounded relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-neutral-700 to-transparent"
-                animate={{ x: ['-100%', '100%'] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "linear", delay: 0.2 }}
-              />
-            </div>
-          </div>
-          <FamilyButtonDemo />
-        </motion.div>
-      </div>
-    );
+    return <div className="h-screen" />;
   }
 
+  // Show connect wallet prompt
   if (!address) {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative pt-20">
@@ -370,16 +252,14 @@ export default function Page() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <p className="text-neutral-500 text-sm tracking-wide mb-4">Connect your wallet to view your songs</p>
+            <p className="text-neutral-500 text-sm tracking-wide">Connect your wallet to view your songs</p>
           </motion.div>
         </main>
-        <motion.div className="p-8 flex justify-end">
-          <FamilyButtonDemo />
-        </motion.div>
       </div>
     );
   }
 
+  // Show no songs message
   if (albums.length === 0) {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative pt-20">
@@ -393,9 +273,6 @@ export default function Page() {
             <p className="text-neutral-600 text-xs">Purchase songs to see them here</p>
           </motion.div>
         </main>
-        <motion.div className="p-8 flex justify-end">
-          <FamilyButtonDemo />
-        </motion.div>
       </div>
     );
   }
@@ -482,12 +359,15 @@ export default function Page() {
                     }}
                   >
                     {album.image ? (
-                      <Image
-                        src={album.image}
-                        alt={album.title}
-                        fill
-                        className="object-cover"
-                      />
+                      <div className="absolute inset-0 w-full h-full">
+                        <Image
+                          src={album.image}
+                          alt={album.title}
+                          fill
+                          sizes="240px"
+                          className="object-cover"
+                        />
+                      </div>
                     ) : (
                       <motion.span
                         className="opacity-30 text-sm tracking-widest"
@@ -547,21 +427,6 @@ export default function Page() {
           <p className="text-neutral-400 font-medium mb-1">{albums[centerIndex]?.artist}</p>
           <p className="text-neutral-600 text-xs mb-2">{albums[centerIndex]?.genre}</p>
           <p>{albums[centerIndex]?.description}</p>
-        </motion.div>
-        <motion.div
-          className="text-neutral-400 text-2xl relative"
-          initial={{ opacity: 0, rotate: -180 }}
-          animate={{
-            opacity: 1,
-            rotate: 0,
-            transition: {
-              delay: 0.5,
-              duration: 0.4,
-              ease: "easeOut",
-            }
-          }}
-        >
-          <FamilyButtonDemo />
         </motion.div>
       </motion.div>
     </div>

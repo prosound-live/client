@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/header";
 import { RainbowkitProvider } from "@/components/rainbowkit-provider";
+import { FamilyButtonProvider } from "@/contexts/family-button-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,8 +35,10 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <RainbowkitProvider>
             <Providers>
-              <Header />
-              {children}
+              <FamilyButtonProvider>
+                <Header />
+                {children}
+              </FamilyButtonProvider>
             </Providers>
           </RainbowkitProvider>
         </ThemeProvider>
