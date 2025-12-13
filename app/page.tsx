@@ -2,8 +2,43 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus } from 'lucide-react';
-import { TEE_URI } from '@/lib/constants';
+import { FACTORY_ADDRESS, FACTORY_ABI, TEE_URI, MOCKERC20_ADDRESS } from '@/lib/constants';
 import Image from 'next/image';
+import { usePublicClient, useWriteContract, useAccount } from 'wagmi';
+import { parseEther } from 'viem';
+
+// ERC20 ABI for approve, allowance, and balanceOf
+const ERC20_ABI = [
+  {
+    name: "approve",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    name: "allowance",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "account", type: "address" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
 
 interface SongAttribute {
   trait_type: string;
@@ -21,6 +56,7 @@ interface SongProperties {
 
 interface Song {
   tokenId: string;
+  nfttokenId: string;
   name: string;
   description: string;
   image: string;
@@ -42,6 +78,7 @@ interface ApiResponse {
 
 type Album = {
   id: string;
+  nftTokenId: string;
   title: string;
   color: string;
   artist: string;
@@ -49,6 +86,7 @@ type Album = {
   price: number;
   image: string;
   description: string;
+  encryptedCid: string;
 };
 
 const colorPalette = [
@@ -118,7 +156,164 @@ function CornerBrackets({ visible }: { visible: boolean }) {
 
 function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index: number; isSelected: boolean; onSelect: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isRenting, setIsRenting] = useState(false);
   const showBrackets = isHovered || isSelected;
+  const { writeContractAsync } = useWriteContract();
+  const { address } = useAccount();
+  const publicClient = usePublicClient();
+
+  const handleRentNow = async (album: Album) => {
+    if (!address || !publicClient) {
+      console.error("Wallet not connected");
+      return;
+    }
+
+    setIsRenting(true);
+
+    try {
+      console.log("Rent Now clicked:", {
+        nftTokenId: album.nftTokenId,
+        encryptedCid: album.encryptedCid,
+        price: album.price,
+      });
+
+      // Get the actual WIP token address from the Factory contract
+      const wipAddress = await publicClient.readContract({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FACTORY_ABI,
+        functionName: "getWIPAddress",
+      }) as `0x${string}`;
+
+      console.log("WIP Token Address from Factory:", wipAddress);
+      console.log("MOCKERC20_ADDRESS from constants:", MOCKERC20_ADDRESS);
+      console.log("Addresses match:", wipAddress.toLowerCase() === MOCKERC20_ADDRESS.toLowerCase());
+      console.log("Factory address being approved:", FACTORY_ADDRESS);
+
+      // Also get RentalNFT address - contract might delegate transferFrom to it
+      const rentalNftAddress = await publicClient.readContract({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FACTORY_ABI,
+        functionName: "getRentalNFTAddress",
+      }) as `0x${string}`;
+      console.log("RentalNFT address:", rentalNftAddress);
+
+      // Check allowance for RentalNFT as well
+      const rentalNftAllowance = await publicClient.readContract({
+        address: wipAddress,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [address, rentalNftAddress],
+      });
+      console.log("Allowance for RentalNFT:", rentalNftAllowance.toString());
+
+      // Calculate rental cost (price * months)
+      const months = 1;
+      const rentalCost = parseEther(album.price.toString()) * BigInt(months);
+
+      console.log("Rental cost:", rentalCost.toString(), "WIP (wei)");
+
+      // Check user's WIP token balance
+      const userBalance = await publicClient.readContract({
+        address: wipAddress,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [address],
+      });
+
+      console.log("User WIP balance:", userBalance.toString(), "wei");
+
+      if (userBalance < rentalCost) {
+        console.error("Insufficient WIP balance. Need:", rentalCost.toString(), "Have:", userBalance.toString());
+        alert(`Insufficient WIP balance. You need ${album.price} WIP tokens.`);
+        return;
+      }
+
+      // Check current allowance using the actual WIP address
+      const currentAllowance = await publicClient.readContract({
+        address: wipAddress,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [address, FACTORY_ADDRESS as `0x${string}`],
+      });
+
+      console.log("Current allowance:", currentAllowance.toString());
+
+      // If allowance is insufficient, request approval with max uint256 for convenience
+      if (currentAllowance < rentalCost) {
+        console.log("Insufficient allowance, requesting approval...");
+
+        // Approve max uint256 so user doesn't need to approve again
+        const maxApproval = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+        const approveHash = await writeContractAsync({
+          address: wipAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [FACTORY_ADDRESS as `0x${string}`, maxApproval],
+        });
+
+        console.log("Approval tx submitted:", approveHash);
+
+        // Wait for more confirmations to ensure approval is processed
+        const approveReceipt = await publicClient.waitForTransactionReceipt({
+          hash: approveHash,
+          confirmations: 2,
+        });
+
+        if (approveReceipt.status !== "success") {
+          throw new Error("Approval transaction failed");
+        }
+
+        console.log("Approval successful");
+
+        // Verify the new allowance
+        const newAllowance = await publicClient.readContract({
+          address: wipAddress,
+          abi: ERC20_ABI,
+          functionName: "allowance",
+          args: [address, FACTORY_ADDRESS as `0x${string}`],
+        });
+        console.log("New allowance after approval:", newAllowance.toString());
+      }
+
+      // Final verification right before rent call
+      const finalAllowance = await publicClient.readContract({
+        address: wipAddress,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [address, FACTORY_ADDRESS as `0x${string}`],
+      });
+      console.log("Final allowance check before rent:", finalAllowance.toString());
+      console.log("Rental cost:", rentalCost.toString());
+      console.log("Allowance >= Cost:", finalAllowance >= rentalCost);
+
+      if (finalAllowance < rentalCost) {
+        throw new Error(`Allowance still insufficient after approval. Have: ${finalAllowance}, Need: ${rentalCost}`);
+      }
+
+      // Now rent the record - uses WIP token (ERC20), not native IP
+      const hash = await writeContractAsync({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FACTORY_ABI,
+        functionName: "rentRecord",
+        args: [BigInt(album.nftTokenId), 0, 1, `https://ipfs.io/ipfs/${album.encryptedCid}`],
+      });
+
+      console.log("Rent tx submitted:", hash);
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status !== "success") {
+        throw new Error("Rent transaction failed");
+      }
+
+      console.log("Rent transaction successful:", receipt);
+    } catch (error) {
+      console.error("Rent failed:", error);
+    } finally {
+      setIsRenting(false);
+    }
+  }
 
   return (
     <motion.div
@@ -183,21 +378,22 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
 
           {/* Add Button */}
           <motion.button
-            className="absolute bottom-3 right-3 cursor-pointer px-4 py-2 bg-card rounded-full flex items-center justify-center shadow-lg"
+            className={`absolute bottom-3 right-3 cursor-pointer px-4 py-2 bg-card rounded-full flex items-center justify-center shadow-lg ${isRenting ? 'opacity-50 cursor-not-allowed' : ''}`}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{
               opacity: isHovered || isSelected ? 1 : 0,
               scale: isHovered || isSelected ? 1 : 0.8
             }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: isRenting ? 1 : 1.1 }}
+            whileTap={{ scale: isRenting ? 1 : 0.95 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            disabled={isRenting}
             onClick={(e) => {
               e.stopPropagation();
-              // Handle add to cart
+              if (!isRenting) handleRentNow(album);
             }}
           >
-            Rent Now
+            {isRenting ? 'Renting...' : 'Rent Now'}
           </motion.button>
 
           {/* Genre Badge */}
@@ -262,6 +458,7 @@ export default function Marketplace() {
         if (data.success && data.payload.items) {
           const transformedAlbums: Album[] = data.payload.items.map((song, index) => ({
             id: song.tokenId,
+            nftTokenId: song.nfttokenId,
             title: song.name,
             color: colorPalette[index % colorPalette.length],
             artist: song.properties.artist,
@@ -269,6 +466,7 @@ export default function Marketplace() {
             price: parseFloat(song.properties.pricePerMonth),
             image: song.image,
             description: song.description,
+            encryptedCid: song.properties.encryptedCid,
           }));
           setAlbums(transformedAlbums);
 

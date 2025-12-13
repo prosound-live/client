@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useWriteContract, usePublicClient, useConfig } from "wagmi";
 import { getWalletClient } from "@wagmi/core";
-import { parseEther, http, zeroAddress } from "viem";
+import { parseEther, http, zeroAddress, parseUnits } from "viem";
 import { StoryClient, TokenIdInput } from "@story-protocol/core-sdk";
 import {
   FACTORY_ADDRESS,
@@ -202,7 +202,7 @@ export function useMintRecord(): UseMintRecordResult {
         // ==================== STEP 2: Mint NFT ====================
         setStatus("waiting-approval");
 
-        const priceInWei = parseEther(pricePerMonth);
+        const priceInWei = parseUnits(pricePerMonth, 10);
 
         const hash = await writeContractAsync({
           address: FACTORY_ADDRESS as `0x${string}`,
