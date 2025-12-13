@@ -479,19 +479,18 @@ type MotionProps = {
 }
 
 const DynamicTitle = ({ className, children }: MotionProps) => {
-  const { state } = useDynamicIslandSize()
-  const { size, previousSize } = state
   const willChange = useWillChange()
 
   return (
     <motion.h3
       className={className}
-      initial={{ opacity: 0, scale: 0 }}
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{
-        opacity: size === previousSize ? 0 : 1,
-        scale: size === previousSize ? 0.9 : 1,
+        opacity: 1,
+        scale: 1,
         transition: { type: "spring", stiffness, damping },
       }}
+      exit={{ opacity: 0, scale: 0.9 }}
       style={{ willChange }}
     >
       {children}
