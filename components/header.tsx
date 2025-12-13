@@ -37,7 +37,7 @@ export function Header() {
 
       <nav
         className={`flex justify-center items-center p-6 gap-6 text-sm tracking-wide text-neutral-500
-        ${isMySongs ? "" : "bg-neutral-200 dark:bg-neutral-900"}`}
+        ${isMySongs ? "" : ""}`}
       >
         <Link
           href="/"

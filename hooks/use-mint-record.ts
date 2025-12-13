@@ -27,6 +27,7 @@ export interface MusicMetadataForIPFS {
   image: string;
   encryptedMusicCid: string;
   createdAt: string;
+  tokenId?: string;
 }
 
 export interface PinataUploadResponse {
@@ -447,7 +448,10 @@ export function useMintRecord(): UseMintRecordResult {
       await notifyTEE({
         userAddress: pendingData.userAddress,
         encryptedCid: pendingData.encryptedCid,
-        metadata: pendingData.metadata,
+        metadata: {
+          ...pendingData.metadata,
+          tokenId: tokenId,
+        },
         ipId: registeredIpId,
         licenseTermsId: newLicenseTermsId,
         tokenId: tokenId,
