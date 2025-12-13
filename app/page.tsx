@@ -197,7 +197,7 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
               // Handle add to cart
             }}
           >
-            <Plus className="w-4 h-4 text-card-foreground" />
+            Buy Now
           </motion.button>
 
           {/* Genre Badge */}
