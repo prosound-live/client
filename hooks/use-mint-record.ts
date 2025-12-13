@@ -66,7 +66,7 @@ export interface UseMintRecordResult {
 
 async function notifyTEE(payload: TEENotifyPayload): Promise<void> {
   console.log('payload', payload)
-  const response = await fetch(`${TEE_URI}/api/v1/record/notify`, {
+  const response = await fetch(`${TEE_URI}/api/v1/NFT/uploaddata`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
