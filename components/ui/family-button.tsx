@@ -71,7 +71,7 @@ const FamilyButtonContainer: FC<FamilyButtonContainerProps> = ({
     return (
         <motion.div
             className={cn(
-                "relative   border-white/10 border shadow-lg flex flex-col space-y-1  items-center  text-white  cursor-pointer z-10",
+                "relative  border-white/10 border shadow-lg flex flex-col space-y-1  items-center  text-white  cursor-pointer z-10",
                 !isExpanded
                     ? "bg-gradient-to-b from-neutral-900 to-stone-900 dark:from-stone-700 dark:to-neutral-800/80"
                     : ""

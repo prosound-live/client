@@ -2,6 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, animate } from 'framer-motion';
 import FamilyButton from '@/components/ui/family-button';
+import FamilyButtonDemo from '@/components/family-demo';
 
 const albums = [
   {
@@ -358,9 +359,7 @@ export default function Page() {
             }
           }}
         >
-          <FamilyButton>
-            {null}
-          </FamilyButton>
+          <FamilyButtonDemo />
         </motion.div>
       </motion.div>
     </div>
