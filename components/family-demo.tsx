@@ -1,27 +1,51 @@
 "use client"
 
 import { useState } from "react"
-import { Copy, Check, Upload, Wallet } from "lucide-react"
+import { Copy, Check, Upload } from "lucide-react"
 import { motion } from "framer-motion"
 import { useAccount, useBalance } from "wagmi"
 import Image from "next/image"
 import FamilyButton from "@/components/ui/family-button"
+import { MusicUploadDrawer } from "@/components/music-upload-drawer"
 
 const TOKEN_ADDRESS = "0xF1815bd50389c46847f0Bda824eC8da914045D14" as const
 
 export function FamilyButtonDemo() {
+    // State to control the wallet button/popover
+    const [walletOpen, setWalletOpen] = useState(false)
+    // State to control the music upload drawer
+    const [uploadDrawerOpen, setUploadDrawerOpen] = useState(false)
+
+    const handleUploadClick = () => {
+        setWalletOpen(false) // Close the wallet popover first
+        // Small delay to let the wallet close before opening upload drawer
+        setTimeout(() => {
+            setUploadDrawerOpen(true)
+        }, 150)
+    }
+
     return (
         <div className="w-full h-full">
             <div className="absolute bottom-4 right-4">
-                <FamilyButton>
-                    <WalletContent />
+                <FamilyButton open={walletOpen} onOpenChange={setWalletOpen}>
+                    <WalletContent onUploadClick={handleUploadClick} />
                 </FamilyButton>
             </div>
+
+            {/* Music Upload Drawer - OUTSIDE of FamilyButton */}
+            <MusicUploadDrawer 
+                open={uploadDrawerOpen} 
+                onOpenChange={setUploadDrawerOpen} 
+            />
         </div>
     )
 }
 
-function WalletContent() {
+interface WalletContentProps {
+    onUploadClick: () => void
+}
+
+function WalletContent({ onUploadClick }: WalletContentProps) {
     const [copied, setCopied] = useState(false)
 
     const { address: fullAddress, isConnected } = useAccount()
@@ -49,14 +73,8 @@ function WalletContent() {
         setTimeout(() => setCopied(false), 2000)
     }
 
-    const handleUpload = () => {
-        // Trigger file upload or navigate to upload page
-        console.log("Upload music clicked")
-    }
-
     return (
         <div className="flex flex-col items-center pt-4 w-full">
-
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -72,8 +90,6 @@ function WalletContent() {
                 />
                 {balance} USDC
             </motion.div>
-
-            <div></div>
 
             {/* Address Section */}
             <motion.div
@@ -97,12 +113,12 @@ function WalletContent() {
                 </button>
             </motion.div>
 
-            {/* Upload Button */}
+            {/* Upload Button - triggers the external drawer */}
             <motion.button
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                onClick={handleUpload}
+                onClick={onUploadClick}
                 className="flex items-center justify-center cursor-pointer hover:bg-yellow-400 hover:-translate-y-1.5 gap-2 w-full bg-yellow-300 text-black text-sm font-medium rounded-lg px-4 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-500/20"
             >
                 <Upload className="w-4 h-4" />
