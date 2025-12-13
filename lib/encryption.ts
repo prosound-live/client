@@ -55,7 +55,9 @@ export async function encryptMusicFile(
   );
 
   return {
-    encryptedFile: new Blob([encryptedBuffer], { type: "application/octet-stream" }),
+    encryptedFile: new Blob([encryptedBuffer], {
+      type: "application/octet-stream",
+    }),
     iv: bufferToHex(iv),
     encryptedKey,
     fileName: file.name,
@@ -71,4 +73,3 @@ function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
-

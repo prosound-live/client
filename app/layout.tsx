@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/header";
+import { RainbowkitProvider } from "@/components/rainbowkit-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,10 +32,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <Providers>
-            <Header />
-            {children}
-          </Providers>
+          <RainbowkitProvider>
+            <Providers>
+              <Header />
+              {children}
+            </Providers>
+          </RainbowkitProvider>
         </ThemeProvider>
       </body>
     </html >
