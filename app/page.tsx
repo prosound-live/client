@@ -197,7 +197,7 @@ function AlbumCard({ album, index, isSelected, onSelect }: { album: Album; index
               // Handle add to cart
             }}
           >
-            Buy Now
+            Rent Now
           </motion.button>
 
           {/* Genre Badge */}
