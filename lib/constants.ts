@@ -1,6 +1,6 @@
 import FACTORY_ABI_JSON from "@/abis/factory.json";
 export const TEE_URI =
-  "https://nondiffuse-prejudgementally-aiko.ngrok-free.dev";
+  "https://tee.prosound.live";
 
 // Contract addresses
 export const FACTORY_ADDRESS = "0x4ee451599a5b4E293c48b21092dd568e233A9b87";
